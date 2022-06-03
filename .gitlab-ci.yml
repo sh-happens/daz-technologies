@@ -1,0 +1,72 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+stages:
+  - test
+  - build
+  - deploy
+sast:
+  stage: test
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+jest-tests:
+  stage: test
+  image: node
+  script:
+    - npm install
+    - CI=true npm run test:ci
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - junit.xml
+
+docker-build-dev:
+  image: node:14-alpine
+  tags:
+    - shared
+  stage: build
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  services:
+    - docker:dind
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+
+  before_script:
+    - apk update
+    - apk add --no-cache docker
+    - docker login --username $ACCESS_USERNAME --password $ACCESS_TOKEN registry.gitlab.com
+
+  script:
+    - npm install
+    - npm run build
+    - docker build -f Dockerfile -t $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA .
+    - docker push $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA
+  only:
+    - main
+  artifacts:
+    paths:
+      - node_modules/
+
+deploy to k8s dev:
+  image: alpine/k8s:1.20.7
+  stage: deploy
+
+  only:
+    - main
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  tags:
+    - k8s
+  script:
+    - helm upgrade  petrel-app ./helm --install --set-string=image.repository=$CI_REGISTRY_IMAGE --set-string=image.branch=$CI_COMMIT_REF_NAME --set-string=image.tag=$CI_COMMIT_SHORT_SHA -n internal
