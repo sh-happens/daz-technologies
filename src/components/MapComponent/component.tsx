@@ -1,15 +1,25 @@
 import React from "react";
-import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 
 const containerStyle = {
   width: "400px",
   height: "400px",
 };
 
-const center = {
-  lat: -3.745,
-  lng: -38.523,
-};
+const centers = [
+  {
+    lat: 37.772,
+    lng: -122.214,
+  },
+  {
+    lat: 37.672,
+    lng: -122.219,
+  },
+  {
+    lat: 37.832,
+    lng: -122.424,
+  },
+];
 
 export const MapComponent = () => {
   const { isLoaded } = useJsApiLoader({
@@ -20,7 +30,7 @@ export const MapComponent = () => {
   const [map, setMap] = React.useState(null);
 
   const onLoad = React.useCallback(function callback(map) {
-    const bounds = new window.google.maps.LatLngBounds(center);
+    const bounds = new window.google.maps.LatLngBounds(centers[0]);
     map.fitBounds(bounds);
     setMap(map);
   }, []);
@@ -32,12 +42,17 @@ export const MapComponent = () => {
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={containerStyle}
-      center={center}
+      center={centers[0]}
       zoom={10}
       onLoad={onLoad}
       onUnmount={onUnmount}
     >
-      {/* Child components, such as markers, info windows, etc. */}
+      <Marker
+        icon={
+          "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png"
+        }
+        position={centers[1]}
+      />
       <></>
     </GoogleMap>
   ) : (
